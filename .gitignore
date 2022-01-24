@@ -1,0 +1,4 @@
+_physicsSimulations/
+.idea/
+__pycache__/
+data.json
