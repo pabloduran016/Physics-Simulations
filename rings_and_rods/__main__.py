@@ -620,6 +620,7 @@ class Simulation:
             self._events()
             self._update()
             self._draw()
+            pg.display.flip()
         pg.quit()
 
     def _events(self):
@@ -715,7 +716,6 @@ class Simulation:
         gl.glDisable(gl.GL_LIGHTING)
         gl.glDisable(gl.GL_COLOR_MATERIAL)
         gl.glPopMatrix()
-        pg.display.flip()
 
 
 if __name__ == '__main__':
