@@ -64,8 +64,8 @@ class Grid:
         self.grid['amp'] = amp
         self.grid['a_freq'] = 2*pi/per
         self.grid['phase'] = phase
-        self.grid['kx'] = 2*pi/wl
-        self.grid['kz'] = 2*pi/wl
+        self.grid['k'] = 2*pi/wl
+        self.grid['size'] = size
 
         cell_s = size / n
 
@@ -79,6 +79,7 @@ class Grid:
                     self.triangles[i, k, 0, :] = [i*n + k,   i*n + k+1,   (i+1)*n + k]
                     self.triangles[i, k, 1, :] = [i*n + k+1, (i+1)*n + k, (i+1)*n + k + 1]
 
+                if i != n-1 and k != n-1:
                     self.edges[i, k, 0, :] = [i*n + k, i*n + k+1]
                     self.edges[i, k, 1, :] = [i*n + k, (i+1)*n + k]
 
@@ -97,28 +98,28 @@ class Grid:
         self.grid['model'] = model
         view = np.eye(4, dtype=np.float32)
         glm.rotate(view, 45, 0, 1, 0)
-        glm.rotate(view, 20, 1, 0, 0)
+        glm.rotate(view, 30, 1, 0, 0)
         glm.translate(view, 0, 0, -self.size*1.5)
         self.grid['view'] = view
 
     def update(self, t: float):
         self.grid['t'] = t*1000
-        view = np.eye(4, dtype=np.float32)
-        glm.rotate(view, t*20, 0, 1, 0)
-        glm.rotate(view, 20, 1, 0, 0)
-        glm.translate(view, 0, 0, -self.size*1.5)
-        self.grid['view'] = view
+        # view = np.eye(4, dtype=np.float32)
+        # glm.rotate(view, t*20, 0, 1, 0)
+        # glm.rotate(view, 20, 1, 0, 0)
+        # glm.translate(view, 0, 0, -self.size*1.5)
+        # self.grid['view'] = view
         pass
 
     def draw(self):
-        # Filled cube
+        # Filled
         gl.glDisable(gl.GL_BLEND)
         gl.glEnable(gl.GL_DEPTH_TEST)
         gl.glEnable(gl.GL_POLYGON_OFFSET_FILL)
         self.grid['color'] = gl_color(CELESTE)
         self.grid.draw(gl.GL_TRIANGLES, self.triangles)
 
-        # Outlined cube
+        # Outlined
         # gl.glDisable(gl.GL_POLYGON_OFFSET_FILL)
         # gl.glEnable(gl.GL_BLEND)
         # gl.glDepthMask(gl.GL_FALSE)
@@ -127,12 +128,12 @@ class Grid:
         # gl.glDepthMask(gl.GL_TRUE)
 
 
-GRID_SIZE = 20
-GRID_N = 100
+GRID_SIZE = 40
+GRID_N = 500
 
-WAVE_AMP = 5
-WAVE_T = 8e3
-WAVE_WL = 6
+WAVE_AMP = 1.5
+WAVE_T = 4e3
+WAVE_WL = 3.5
 WAVE_PHASE = 0
 
 FOV = 60  # field of view
