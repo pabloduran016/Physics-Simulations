@@ -1,5 +1,6 @@
 uniform mat4   model;         // Model matrix
-uniform mat4   view;          // View matrix
+uniform mat4   rotation;          // View matrix
+uniform mat4   translation;          // View matrix
 uniform mat4   projection;    // Projection matrix
 attribute vec3 position;      // Vertex position
 uniform float amp;
@@ -21,7 +22,7 @@ vec3 wave_func(vec3 pos)
 
 void main()
 {
-    vec4 pos = projection * view * model * vec4(wave_func(position), 1.0);
+    vec4 pos = projection * translation * rotation * model * vec4(wave_func(position), 1.0);
     gl_Position = pos;
     v_color = color / pos.w * size;
 }

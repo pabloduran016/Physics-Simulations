@@ -14,7 +14,7 @@ from numpy import pi
 
 # Constants
 WIDTH, HEIGHT = SIZE = 800, 800
-FPS = 60
+FPS = 80
 TITLE = ''
 GRAVITY = 0, 1
 
