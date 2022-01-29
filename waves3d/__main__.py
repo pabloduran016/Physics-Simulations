@@ -2,6 +2,9 @@
 Script to
 Written by Pablo Duran (https://github.com/pabloduran016)
 """
+from dataclasses import dataclass
+from typing import List
+
 from glumpy import app, gloo, gl, glm, key
 from numpy import pi
 
@@ -48,47 +51,52 @@ PLANE_VERTEX_SHADER = load_shader('waves3d/plane.vert')
 PLANE_FRAGMENT_SHADER = load_shader('waves3d/plane.frag')
 
 
-class Wave3D:
-    def __init__(self, size: float, n: int, amp: float, per: float, phase: float, wl: float):
+def load_wave_vertex_shader(waves: List['Wave3d']):
+    ind = WAVE_VERTEX_SHADER.find('wave_func')
+    enter = WAVE_VERTEX_SHADER[ind:].find('{') + ind + 1
+    close = WAVE_VERTEX_SHADER[enter:].find('}') + enter
+
+    string = " + \n".join([f"({w.amp} * cos(d * {2*pi/w.wl} - {2*pi/w.per} * t + {w.phase}))" for w in waves])
+
+    body = f"""
+    float d = sqrt(pos.x*pos.x + pos.z*pos.z);
+    float y = ({string});
+    return vec3(pos.x, y, pos.z);
+"""
+
+    return WAVE_VERTEX_SHADER[:enter] + body + WAVE_VERTEX_SHADER[close:]
+
+@dataclass
+class Wave3d:
+    amp: float
+    per: float
+    wl: float
+    phase: float
+
+
+class Grid:
+    def __init__(self, size: float, n: int, waves: List[Wave3d]):
         self.size = size
         self.n = n
         self.cell_size = size / n
 
-        self.grid = gloo.Program(WAVE_VERTEX_SHADER, WAVE_FRAGMENT_SHADER)
+        v_shader = load_wave_vertex_shader(waves)
+        self.grid = gloo.Program(v_shader, WAVE_FRAGMENT_SHADER)
 
-        self.grid['amp'] = amp
-        self.grid['a_freq'] = 2*pi/per
-        self.grid['phase'] = phase
-        self.grid['k'] = 2*pi/wl
         self.grid['size'] = size
+
         # self.grid['height'] = h
 
-        cell_s = size / n
+        vertices, edges, triangles = self.gen_vertices(n, size)
 
-        # TODO: Use the height to create a water cube
-        self.vertices = np.zeros((n, n), [('position', np.float32, 3)])
-        self.triangles = np.zeros((n-1, n-1, 2, 3), dtype=np.uint32)
-        self.edges = np.zeros((n-1, n, 2, 2), dtype=np.uint32)
-        for i in range(n):
-            for k in range(n):
-                self.vertices[i, k]['position'] = [(i - (n-1) / 2)*cell_s, 0, (k - (n-1) / 2)*cell_s]
-                if i != n-1 and k != n-1:
-                    self.triangles[i, k, 0, :] = [i*n + k,   i*n + k+1,   (i+1)*n + k]
-                    self.triangles[i, k, 1, :] = [i*n + k+1, (i+1)*n + k, (i+1)*n + k + 1]
-
-                if i != n-1 and k != n-1:
-                    self.edges[i, k, 0, :] = [i*n + k, i*n + k+1]
-                    self.edges[i, k, 1, :] = [i*n + k, (i+1)*n + k]
-
-                elif k == n-1 and i != n-1:
-                    self.edges[i, k, 0, :] = [k*n + i, k*n + i+1]
-                    self.edges[i, k, 1, :] = [i*n + k, (i+1)*n + k]
-
-        self.vertices = self.vertices.reshape((n*n)).view(gloo.VertexBuffer)
-        self.triangles = self.triangles.reshape(((n-1)**2)*2*3).view(gloo.IndexBuffer)
-        self.edges = self.edges.reshape((n-1)*n*2*2).view(gloo.IndexBuffer)
+        self.vertices = vertices.view(gloo.VertexBuffer)
+        self.triangles = triangles.view(gloo.IndexBuffer)
+        self.edges = edges.view(gloo.IndexBuffer)
         self.grid['color'] = gl_color(CELESTE)
         self.grid.bind(self.vertices)
+
+    def gen_vertices(self, n: int, cell_s: float) -> Tuple[np.ndarray, ...]:
+        raise NotImplementedError
 
     def change(self, model=None, trans=None, rot=None) -> None:
         if trans is not None:
@@ -107,16 +115,74 @@ class Wave3D:
         gl.glDisable(gl.GL_BLEND)
         gl.glEnable(gl.GL_DEPTH_TEST)
         gl.glEnable(gl.GL_POLYGON_OFFSET_FILL)
-        # self.grid['color'] = gl_color(CELESTE)
+        self.grid['color'] = gl_color(CELESTE)
         self.grid.draw(gl.GL_TRIANGLES, self.triangles)
 
         # Outlined
-        # gl.glDisable(gl.GL_POLYGON_OFFSET_FILL)
-        # gl.glEnable(gl.GL_BLEND)
-        # gl.glDepthMask(gl.GL_FALSE)
-        # self.grid['color'] = gl_color(BLACK)
-        # self.grid.draw(gl.GL_LINES, self.edges)
-        # gl.glDepthMask(gl.GL_TRUE)
+        gl.glDisable(gl.GL_POLYGON_OFFSET_FILL)
+        gl.glEnable(gl.GL_BLEND)
+        gl.glDepthMask(gl.GL_FALSE)
+        self.grid['color'] = gl_color(BLACK)
+        self.grid.draw(gl.GL_LINES, self.edges)
+        gl.glDepthMask(gl.GL_TRUE)
+
+
+class SquaredGrid(Grid):
+    def gen_vertices(self, n: int, size: float) -> Tuple[np.ndarray, ...]:
+        cell_s = size / n
+        # TODO: Use the height to create a water cube
+        vertices = np.zeros((n, n), [('position', np.float32, 3)])
+        triangles = np.zeros((n - 1, n - 1, 2, 3), dtype=np.uint32)
+        edges = np.zeros((n - 1, n, 2, 2), dtype=np.uint32)
+        for i in range(n):
+            for k in range(n):
+                vertices[i, k]['position'] = [(i - (n - 1) / 2) * cell_s, 0, (k - (n - 1) / 2) * cell_s]
+                if i != n - 1 and k != n - 1:
+                    triangles[i, k, 0, :] = [i * n + k, i * n + k + 1, (i + 1) * n + k]
+                    triangles[i, k, 1, :] = [i * n + k + 1, (i + 1) * n + k, (i + 1) * n + k + 1]
+
+                if i != n - 1 and k != n - 1:
+                    edges[i, k, 0, :] = [i * n + k, i * n + k + 1]
+                    edges[i, k, 1, :] = [i * n + k, (i + 1) * n + k]
+
+                elif k == n - 1 and i != n - 1:
+                    edges[i, k, 0, :] = [k * n + i, k * n + i + 1]
+                    edges[i, k, 1, :] = [i * n + k, (i + 1) * n + k]
+
+        return vertices.reshape((n*n)), edges.reshape((n-1)*n*2*2), triangles.reshape(((n-1)**2)*2*3)
+
+
+class CircularGrid(Grid):
+    def gen_vertices(self, n: int, size: float) -> Tuple[np.ndarray, ...]:
+        cell_s = size / n
+        r = size / 2
+        s = r/ n
+        # TODO: Use the height to create a water cube
+        vertices = np.zeros((n, n), [('position', np.float32, 3)])
+        triangles = np.zeros((n - 1, n - 1, 2, 3), dtype=np.uint32)
+        edges = np.zeros((n - 1, n, 2, 2), dtype=np.uint32)
+        for i in range(n):
+            for k in range(n):
+                x = (i - (n - 1) / 2) * cell_s
+                z = (k - (n - 1) / 2) * cell_s
+                d = np.sqrt(x**2 + z**2)
+                if d > r:
+                    continue
+                vertices[i, k]['position'] = [x, 0, z]
+                if i != n - 1 and k != n - 1:
+                    triangles[i, k, 0, :] = [i * n + k, i * n + k + 1, (i + 1) * n + k]
+                    triangles[i, k, 1, :] = [i * n + k + 1, (i + 1) * n + k, (i + 1) * n + k + 1]
+
+                if i != n - 1 and k != n - 1:
+                    edges[i, k, 0, :] = [i * n + k, i * n + k + 1]
+                    edges[i, k, 1, :] = [i * n + k, (i + 1) * n + k]
+
+                elif k == n - 1 and i != n - 1:
+                    edges[i, k, 0, :] = [k * n + i, k * n + i + 1]
+                    edges[i, k, 1, :] = [i * n + k, (i + 1) * n + k]
+
+        return vertices.reshape((n*n)), edges.reshape((n-1)*n*2*2), triangles.reshape(((n-1)**2)*2*3)
+
 
 class Plane:
     def __init__(self, y: float, color: GLColor):
@@ -154,10 +220,10 @@ class Plane:
 
 
 PLANE_COLOR = gl_color(GREY)
-PLANE_Y = -10
+PLANE_Y = -15
 
 GRID_SIZE = 50
-GRID_N = 500
+GRID_N = 800
 WCUBE_HEIGHT = 10
 
 WAVE_AMP = 1.5
@@ -190,7 +256,12 @@ class Simulation3D:
         self.translation = np.eye(4, dtype=np.float32)
         self.rotation = np.eye(4, dtype=np.float32)
 
-        self.grid = Wave3D(GRID_SIZE, GRID_N, WAVE_AMP, WAVE_T, WAVE_PHASE, WAVE_WL)
+        self.grid = SquaredGrid(GRID_SIZE, GRID_N, [
+            Wave3d(1, 4e3, 3.5, WAVE_PHASE),
+            Wave3d(1.5, 1e3, 8, WAVE_PHASE),
+            Wave3d(8, 5e3, 20, WAVE_PHASE),
+            Wave3d(1, .5e3, 2, WAVE_PHASE),
+        ])
         # self.plane = Plane(PLANE_Y, PLANE_COLOR)
         self.plane = Plane(PLANE_Y, PLANE_COLOR)
         self.reset()

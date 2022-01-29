@@ -3,21 +3,23 @@ uniform mat4   rotation;          // View matrix
 uniform mat4   translation;          // View matrix
 uniform mat4   projection;    // Projection matrix
 attribute vec3 position;      // Vertex position
+uniform float t;
+uniform float size;
 uniform float amp;
+uniform float k;
 uniform float a_freq;
 uniform float phase;
-uniform float t;
-uniform float k;
-uniform float size;
-
 uniform vec4 color;
 varying vec4 v_color;
 
 vec3 wave_func(vec3 pos)
 {
-    float d = sqrt(pos.x*pos.x + pos.z*pos.z);
-    float y = amp * cos(d * k - a_freq * t + phase);
-    return vec3(pos.x, y, pos.z);
+    // filled in the porgram preprocessing
+      float d = sqrt(pos.x*pos.x + pos.z*pos.z);
+      float y = amp * cos(d * k - a_freq * t + phase);
+      return vec3(pos.x, y, pos.z);
+    // ------------------------------------------
+    return pos;
 }
 
 void main()
