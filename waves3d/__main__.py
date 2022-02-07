@@ -325,6 +325,7 @@ class Plane(Sprite):
 
 PLANE_COLOR = gl_color(GREY)
 PLANE_Y = -15
+PLANE_RESOLUTION=10
 
 GRID_SIZE = 100
 GRID_N = 150
@@ -359,6 +360,7 @@ class Simulation3D:
         self.window.event(self.on_key_press)
         self.window.event(self.on_key_release)
         self.window.event(self.on_mouse_drag)
+        self.window.event(self.on_mouse_scroll)
 
         self.translation = np.eye(4, dtype=np.float32)
         self.rotation = np.eye(4, dtype=np.float32)
@@ -443,6 +445,9 @@ class Simulation3D:
 
     def on_key_release(self, _symbol, _modifiers):
         pass
+
+    def on_mouse_scroll(self, _x, _y, _dx, dy):
+        self.translatez(dy*5)
 
     def on_init(self):
         # self.reset()
