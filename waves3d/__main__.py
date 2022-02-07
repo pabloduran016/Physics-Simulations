@@ -286,19 +286,30 @@ def cube(grid: Type[Grid], height: float):
 
 
 class Plane(Sprite):
-    def __init__(self, y: float, color: GLColor):
+    def __init__(self, y: float, color: GLColor, res: int):
         self.plane = gloo.Program(PLANE_VERTEX_SHADER, PLANE_FRAGMENT_SHADER)
-
         # TODO: Use the height to create a water cube
-        self.vertices = np.zeros(4, dtype=[('position', np.float32, 3)])
+        self.vertices = np.zeros((res + 1)**2, dtype=[('position', np.float32, 3)])
+        # self.vertices['position'] = [
+        #     [-1, y, -1], [-1, y, 1],
+        #     [1,  y, -1], [1,  y, 1]
+        # ]
         self.vertices['position'] = [
-            [-1, y, -1], [-1, y, 1],
-            [1,  y, -1], [1,  y, 1]
+            [2*i/res - 1, y, 2*j/res - 1]
+            for i in range(res + 1) for j in range(res + 1)
         ]
 
+        self.indices = np.array([
+            ([i + (res+1)*j, i + (res+1)*(j + 1), i + 1 + (res+1)*j],
+            [i + 1 + (res+1)*(j + 1), i + (res+1)*(j + 1), i + 1 + (res+1)*j])
+            for i in range(res) for j in range(res)
+        ], np.uint32).flatten()
+
+
         self.vertices = self.vertices.view(gloo.VertexBuffer)
+        self.indices = self.indices.view(gloo.IndexBuffer)
         self.plane['color'] = color
-        self.plane['zfar'] = ZFAR
+        self.plane['scale'] = ZFAR / res
         self.plane.bind(self.vertices)
 
     def change(self, trans=None, rot=None, model=None, proj=None) -> None:
@@ -320,7 +331,14 @@ class Plane(Sprite):
         gl.glEnable(gl.GL_DEPTH_TEST)
         gl.glEnable(gl.GL_POLYGON_OFFSET_FILL)
         # self.plane['color'] = gl_color(CELESTE)
-        self.plane.draw(gl.GL_TRIANGLE_STRIP)
+        self.plane.draw(gl.GL_TRIANGLES, self.indices)
+
+        # Outline
+        gl.glDisable(gl.GL_BLEND)
+        gl.glEnable(gl.GL_DEPTH_TEST)
+        gl.glEnable(gl.GL_POLYGON_OFFSET_FILL)
+        # self.plane['color'] = gl_color(CELESTE)
+        self.plane.draw(gl.GL_TRIANGLES, self.indices)
 
 
 PLANE_COLOR = gl_color(GREY)
@@ -364,7 +382,7 @@ class Simulation3D:
 
         self.translation = np.eye(4, dtype=np.float32)
         self.rotation = np.eye(4, dtype=np.float32)
-
+        # TODO: add lighting to the scene. Calculate normals
         self.sprites: List[Sprite] = [
             # SquaredGrid(GRID_SIZE, GRID_N, (GRID_POS[0], GRID_POS[1] + 10, GRID_POS[2]), [
             #     Wave3d(1, 4e3, 3.5, WAVE_PHASE),
@@ -378,7 +396,7 @@ class Simulation3D:
                 Wave3d(8, 5e3, 20, WAVE_PHASE),
                 # Wave3d(1, .5e3, 2, WAVE_PHASE),
             ]),
-            Plane(PLANE_Y, PLANE_COLOR),
+            Plane(PLANE_Y, PLANE_COLOR, PLANE_RESOLUTION),
         ]
         self.reset()
 
