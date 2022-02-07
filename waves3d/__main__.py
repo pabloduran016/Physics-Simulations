@@ -5,7 +5,7 @@ Written by Pablo Duran (https://github.com/pabloduran016)
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List
+from typing import List, Type
 
 from glumpy import app, gloo, gl, glm, key
 from numpy import pi
@@ -122,16 +122,17 @@ class Grid(Sprite):
         self.grid['phases'] = np.zeros(16, dtype=np.float32)
         self.grid['phases'][:n_waves] = np.array([w.phase for w in waves])
 
-        vertices, edges, triangles = self.gen_vertices(n, size)
+        vertices, edges, triangles, height = self.gen_vertices(n, size, 0)
         vertices['position'] += pos
+        self.grid['height'] = height
 
         self.vertices = vertices.view(gloo.VertexBuffer)
         self.triangles = triangles.view(gloo.IndexBuffer)
         self.edges = edges.view(gloo.IndexBuffer)
-        self.grid['color'] = gl_color(CELESTE)
         self.grid.bind(self.vertices)
+        self.grid['color'] = gl_color(CELESTE)
 
-    def gen_vertices(self, n: int, cell_s: float) -> Tuple[np.ndarray, ...]:
+    def gen_vertices(self, n: int, cell_s: float, height: float) -> Tuple:
         raise NotImplementedError
 
     def change(self, model=None, trans=None, rot=None, proj=None) -> None:
@@ -155,16 +156,16 @@ class Grid(Sprite):
         gl.glEnable(gl.GL_POLYGON_OFFSET_FILL)
         self.grid['color'] = gl_color(CELESTE)
         self.grid.draw(gl.GL_TRIANGLES, self.triangles)
-        #
-        # # Outlined
+
+        # Outlined
         # gl.glDisable(gl.GL_POLYGON_OFFSET_FILL)
         # gl.glEnable(gl.GL_BLEND)
         # gl.glDepthMask(gl.GL_FALSE)
         # self.grid['color'] = gl_color(BLACK)
         # self.grid.draw(gl.GL_LINES, self.edges)
         # gl.glDepthMask(gl.GL_TRUE)
-        #
-        # # Points
+
+        # Points
         # gl.glDisable(gl.GL_POLYGON_OFFSET_FILL)
         # gl.glEnable(gl.GL_BLEND)
         # gl.glDepthMask(gl.GL_FALSE)
@@ -174,7 +175,7 @@ class Grid(Sprite):
 
 
 class SquaredGrid(Grid):
-    def gen_vertices(self, n: int, size: float) -> Tuple[np.ndarray, ...]:
+    def gen_vertices(self, n: int, size: float, height: float) -> Tuple:
         cell_s = size / n
         # TODO: Use the height to create a water cube
         vertices = np.zeros((n, n), [('position', np.float32, 3)])
@@ -195,12 +196,12 @@ class SquaredGrid(Grid):
                     edges[i, k, 0, :] = [k * n + i, k * n + i + 1]
                     edges[i, k, 1, :] = [i * n + k, (i + 1) * n + k]
 
-        return vertices.reshape((n*n)), edges.reshape((n-1)*n*2*2), triangles.reshape(((n-1)**2)*2*3)
+        return vertices.reshape((n*n)), edges.reshape((n-1)*n*2*2), triangles.reshape(((n-1)**2)*2*3), height
 
 
 N_ANGLES = 30
 class CircularGrid(Grid):
-    def gen_vertices(self, n: int, size: float) -> Tuple[np.ndarray, ...]:
+    def gen_vertices(self, n: int, size: float, height) -> Tuple:
         r = size / 2
         n = n + 1 if n % 2 == 0 else n
         d_angle = 360 / (N_ANGLES)
@@ -214,7 +215,6 @@ class CircularGrid(Grid):
                 x = point * np.cos(angle * pi / 180)
                 z = point * np.sin(angle * pi / 180)
                 vertices[a*n + p]['position'] = [r*x, 0, r*z]
-
                 if p < n - 1:
                     if a < N_ANGLES - 1:
                         edges[a, p, 0] = (a*n + p, a*n + p + 1)
@@ -224,8 +224,8 @@ class CircularGrid(Grid):
                         elif p == (n - 1)//2: # center triangles
                             triangles[a, p, 0] = a*n + p, a*n + p + 1, (a + 1)*n + p + 1
                         elif point > 0:
-                            triangles[a, p - 1, 0] = a*n + p, a*n + p + 1, (a + 1)*n + p + 1
-                            triangles[a, p - 1, 1] = (a + 1)*n + p, a*n + p, (a + 1)*n + p + 1
+                            triangles[a, p, 0] = a*n + p, a*n + p + 1, (a + 1)*n + p + 1
+                            triangles[a, p, 1] = (a + 1)*n + p, a*n + p, (a + 1)*n + p + 1
                         elif point < 0:
                             triangles[a, p, 0] = a*n + p, a*n + p + 1, (a + 1)*n + p + 1
                             triangles[a, p, 1] = (a + 1)*n + p, a*n + p, (a + 1)*n + p + 1
@@ -237,15 +237,52 @@ class CircularGrid(Grid):
                         elif p == (n - 1)//2: # center triangles
                             triangles[a, p, 0] = a*n + p, a*n + n - p, 0*n + n - p - 2
                         elif point > 0:
-                            triangles[a, p - 1, 0] = a*n + p, a*n + p + 1, 0*n + n - p - 1
-                            triangles[a, p - 1, 1] = a*n + p + 1, 0*n + n - p - 2, 0*n + n - p - 1
+                            triangles[a, p, 0] = a*n + p, a*n + p + 1, 0*n + n - p - 1
+                            triangles[a, p, 1] = a*n + p + 1, 0*n + n - p - 2, 0*n + n - p - 1
                         elif point < 0:
                             triangles[a, p, 0] = a*n + p, a*n + p + 1, 0*n + n - p - 1
                             triangles[a, p, 1] = a*n + p + 1, 0*n + n - p - 2, 0*n + n - p - 1
+                else:
+                    if a < N_ANGLES - 1:
+                        edges[a, p, 0] = (a*n + p, (a + 1)*n + p)
+                    else:
+                        edges[a, p, 1] = (0 + (n - 1 - p), a*n + p)
 
+
+        # triangles[np.reshape([(triangles[i, j, k] == [0, 0, 0]).all() for i in range(triangles.shape[0]) for j in range(triangles.shape[1]) for k in range(triangles.shape[2])], triangles.shape[:-1]), :]
         edges = edges.reshape(N_ANGLES*(n)*2*2)
         triangles = triangles.reshape(N_ANGLES*(n -1)*2*3)
-        return vertices.reshape(N_ANGLES*n), edges, triangles
+        return vertices.reshape(N_ANGLES*n), edges, triangles, height
+
+
+def cube(grid: Type[Grid], height: float):
+    assert grid == CircularGrid, 'Other types of grids are not implemeted, yet'
+    class CubeGrid(grid):
+        def gen_vertices(self, n: int, size: float, _height: float) -> Tuple:
+            n = n if n % 2 == 1 else n + 1
+            vertices, edges, triangles, _ = super().gen_vertices(n, size, height)
+            n_vert = len(vertices)
+            vertices_extruded = np.zeros(2*n_vert, dtype=[('position', np.float32, 3)])
+            vertices_extruded['position'][:n_vert] = vertices['position']
+            vertices_extruded['position'][n_vert:] = vertices['position'] + [0, height, 0]
+            new_edges = np.array([i*n + j + k for i in range(N_ANGLES) for j in [0, n - 1] for k in [0, n_vert]], np.uint32)
+            edges_extruded = np.concatenate((edges, edges + n_vert, new_edges))
+            new_triangles = []
+            for i in range(N_ANGLES):
+                if i < N_ANGLES - 1:
+                    new_triangles.append((i*n, i*n + n_vert, (i + 1)*n + n_vert))
+                    new_triangles.append((i*n, (i + 1)*n, (i + 1)*n + n_vert))
+                    new_triangles.append((i*n + n - 1, i*n + n - 1 + n_vert, (i + 1)*n + n - 1 + n_vert))
+                    new_triangles.append((i*n + n - 1, (i + 1)*n + n - 1, (i + 1)*n + n - 1 + n_vert))
+                else:
+                    new_triangles.append((i*n, i*n + n_vert, n - 1 + n_vert))
+                    new_triangles.append((i*n, n - 1, n - 1 + n_vert))
+                    new_triangles.append((i*n + n - 1, i*n + n - 1 + n_vert, n_vert))
+                    new_triangles.append((i*n + n - 1, 0, n_vert))
+            triangles_extruded = np.concatenate((triangles, triangles + n_vert, np.array(new_triangles, dtype=np.uint32).flatten()))
+            return vertices_extruded, edges_extruded, triangles_extruded, height
+
+    return CubeGrid
 
 
 class Plane(Sprite):
@@ -290,9 +327,9 @@ PLANE_COLOR = gl_color(GREY)
 PLANE_Y = -15
 
 GRID_SIZE = 100
-GRID_N = 200
+GRID_N = 150
 GRID_POS = 0, 0, 0
-WCUBE_HEIGHT = 10
+CUBE_HEIGHT = 30
 
 WAVE_AMP = 1.5
 WAVE_T = 4e3
@@ -333,11 +370,11 @@ class Simulation3D:
             #     # Wave3d(8, 5e3, 20, WAVE_PHASE),
             #     # Wave3d(1, .5e3, 2, WAVE_PHASE),
             # ]),
-            CircularGrid(GRID_SIZE, GRID_N, GRID_POS, [
+            cube(CircularGrid, CUBE_HEIGHT)(GRID_SIZE, GRID_N, GRID_POS, [
                 Wave3d(1, 4e3, 3.5, WAVE_PHASE),
                 Wave3d(1.5, 1e3, 8, WAVE_PHASE),
                 Wave3d(8, 5e3, 20, WAVE_PHASE),
-                Wave3d(1, .5e3, 2, WAVE_PHASE),
+                # Wave3d(1, .5e3, 2, WAVE_PHASE),
             ]),
             Plane(PLANE_Y, PLANE_COLOR),
         ]

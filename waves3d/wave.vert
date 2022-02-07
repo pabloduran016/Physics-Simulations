@@ -11,6 +11,7 @@ uniform mat4 amps;
 uniform mat4 ks;
 uniform mat4 a_freqs;
 uniform mat4 phases;
+uniform float height;
 
 //#define WAVES_CAP 25
 //uniform float amps[WAVES_CAP];
@@ -29,6 +30,7 @@ uniform vec4 color;
 
 vec3 wave_func(vec3 pos)
 {
+    if (pos.y < height) return pos;
     float d = sqrt(pos.x*pos.x + pos.z*pos.z);
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
