@@ -20,12 +20,13 @@ and the arrow keys you can rotate too.
 **Customization:**      
   - Change between the different grid types in the `Simulation` constructor. Use the function `cube` that takes in 
 a grid and a he9ight to make the grid cubical. It returns a new class that you can use top construct the wave as with any other.
-  - Modify constants scattered around to see different outputs
-  - Modify [`waves3d/wave.config`](waves3d/wave.config) to change the waves. You can dop this dinamically and press <kbd>F5</kbd> 
+  - Modify constants in the `Constants` class to see different outputs
+  - Modify [`waves3d/secene.config`](waves3d/scene.config) to change the waves. You can dop this dinamically and press <kbd>F5</kbd> 
     to refresh the simulation. 
-  - Define constants: `#define <name> <value>` value must be float  
+  - Define settings: `<name>=<value>` 
+  - Define constants: `$<name>=<value>` value must be float  
   - Comments start with `//`.
-  - A wave is defined with 4 float parameters: Amplitude, Periodm, Wave Length and Phase separated by spaces
+  - A wave is defined with 4 float parameters: Amplitude, Period, Wave Length and Phase separated by spaces
   
 **Demo video**: [demo.mp4](https://user-images.githubusercontent.com/72514269/151450606-4a5aecd2-4f89-45d2-a564-e09310d22032.mp4)  
 **References**:  
