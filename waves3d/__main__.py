@@ -5,7 +5,7 @@ Written by Pablo Duran (https://github.com/pabloduran016)
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Type
+from typing import List, Type, Dict
 
 from glumpy import app, gloo, gl, glm, key
 from numpy import pi
@@ -42,7 +42,7 @@ TITLE = ''
 #         gl.glEnd()
 
 
-def load_shader(path: str):
+def load_shader(path: str) -> str:
     with open(path, 'r') as f:
         return f.read()
 
@@ -90,6 +90,25 @@ class Wave3d:
     phase: float
 
 
+def load_waves(path: str) -> List[Wave3d]:
+    waves: List[Wave3d] = []
+    defs: Dict[str, float] = {}
+    with open(path, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip()
+            if line.startswith('//'):
+                continue
+            if line.startswith('#define'):
+                name, value = line.split()[1:]
+                defs[name] = float(value)
+                continue
+            values = [(float(x) if x not in defs else defs[x]) for x in line.split()]
+            # FORMAT = AMP PERIOD WAVELENGTH PHASE
+            waves.append(Wave3d(*values))
+    return waves
+
+
 WAVES_CAP=16
 
 
@@ -135,9 +154,27 @@ class Grid(Sprite):
     def gen_vertices(self, n: int, cell_s: float, height: float) -> Tuple:
         raise NotImplementedError
 
-    def change(self, model=None, trans=None, rot=None, proj=None) -> None:
+    def change(self, model=None, trans=None, rot=None, proj=None, waves=None) -> None:
         if trans is not None:
             self.grid['translation'] = trans
+        if waves is not None:
+            if len(waves) > WAVES_CAP:
+                print(f'Number of waves (len(waves)) is bigger than waves capacity ({WAVES_CAP})', file=sys.stderr)
+                exit(1)
+            n_waves = len(waves)
+            self.grid['n_waves'] = n_waves
+
+            self.grid['amps'] = np.zeros(16, dtype=np.float32)
+            self.grid['amps'][:n_waves] = np.array([w.amp for w in waves])
+
+            self.grid['ks'] = np.zeros(16, dtype=np.float32)
+            self.grid['ks'][:n_waves] = np.array([(2 * pi / w.wl) for w in waves])
+
+            self.grid['a_freqs'] = np.zeros(16, dtype=np.float32)
+            self.grid['a_freqs'][:n_waves] = np.array([2 * pi / w.per for w in waves])
+
+            self.grid['phases'] = np.zeros(16, dtype=np.float32)
+            self.grid['phases'][:n_waves] = np.array([w.phase for w in waves])
         if model is not None:
             self.grid['model'] = model
         if rot is not None:
@@ -350,10 +387,11 @@ GRID_N = 150
 GRID_POS = 0, 0, 0
 CUBE_HEIGHT = 30
 
-WAVE_AMP = 1.5
-WAVE_T = 4e3
-WAVE_WL = 3.5
-WAVE_PHASE = 0
+WAVE_CONFIG_PATH = 'waves3d/wave.config'
+# WAVE_AMP = 1.5
+# WAVE_T = 4e3
+# WAVE_WL = 3.5
+# WAVE_PHASE = 0
 
 FOV = 60  # field of view
 ZNEAR, ZFAR = .1, 1000
@@ -390,15 +428,16 @@ class Simulation3D:
             #     # Wave3d(8, 5e3, 20, WAVE_PHASE),
             #     # Wave3d(1, .5e3, 2, WAVE_PHASE),
             # ]),
-            cube(CircularGrid, CUBE_HEIGHT)(GRID_SIZE, GRID_N, GRID_POS, [
-                Wave3d(1, 4e3, 3.5, WAVE_PHASE),
-                Wave3d(1.5, 1e3, 8, WAVE_PHASE),
-                Wave3d(8, 5e3, 20, WAVE_PHASE),
-                # Wave3d(1, .5e3, 2, WAVE_PHASE),
-            ]),
+            cube(CircularGrid, CUBE_HEIGHT)(GRID_SIZE, GRID_N, GRID_POS, load_waves(WAVE_CONFIG_PATH)),
             Plane(PLANE_Y, PLANE_COLOR, PLANE_RESOLUTION),
         ]
         self.reset()
+
+    def reload_config(self):
+        new_waves = load_waves(WAVE_CONFIG_PATH)
+        for sprite in self.sprites:
+            if isinstance(sprite, Grid):
+                sprite.change(waves=new_waves)
 
     def reset(self):
         translation = np.eye(4, dtype=np.float32)
@@ -454,6 +493,9 @@ class Simulation3D:
                 self.translatey(-2)
             elif symbol == key.DOWN:
                 self.translatey(2)
+            elif symbol == key.F5:
+                print('RELOADING CONFIG')
+                self.reload_config()
 
     def on_mouse_drag(self, _x, _y, dx, dy, _button):
         if abs(dy) > 2:

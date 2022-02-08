@@ -17,5 +17,5 @@ vec4 compute_postion(vec3 pos)
 void main() {
     vec4 pos = compute_postion(position);
     gl_Position = projection * translation * rotation * pos;
-    v_color = color / gl_Position.w * 5;
+    v_color = color / length(gl_Position) * scale;
 }

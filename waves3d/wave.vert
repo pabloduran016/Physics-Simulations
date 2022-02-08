@@ -22,12 +22,6 @@ uniform float height;
 varying vec4 v_color;
 uniform vec4 color;
 
-
-#define amp 1. 
-#define k 1.7951958
-#define a_freq 0.0015708
-#define phase 0.
-
 vec3 wave_func(vec3 pos)
 {
     if (pos.y < height) return pos;
@@ -45,6 +39,6 @@ void main()
     gl_PointSize = 10;
     vec4 pos = projection * translation * rotation * model * vec4(wave_func(position), 1.0);
     gl_Position = pos;
-    v_color = color / pos.w * size;
+    v_color = color / length(pos) * size * 2;
 }
 
