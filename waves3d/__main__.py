@@ -460,6 +460,8 @@ class Plane(Sprite):
 
 
 MAX_CHR = 0x110000
+RCTRL = -1
+LCTRL = -1
 
 
 class Simulation3D:
@@ -475,6 +477,9 @@ class Simulation3D:
         self.window.event(self.on_key_release)
         self.window.event(self.on_mouse_drag)
         self.window.event(self.on_mouse_scroll)
+
+        self.keyboard = key.KeyStateHandler()
+        self.window.push_handlers(self.keyboard)
 
         self.translation = np.eye(4, dtype=np.float32)
         self.rotation = np.eye(4, dtype=np.float32)
@@ -557,10 +562,14 @@ class Simulation3D:
                 self.reload_config()
 
     def on_mouse_drag(self, _x, _y, dx, dy, _button):
-        if abs(dy) > 2:
-            self.rotatex(np.arctan(dy)*1.3)
-        if abs(dx) > 2:
-            self.rotatey(np.arctan(dx)*1.3)
+        if self.keyboard[LCTRL] or self.keyboard[RCTRL]:
+            self.translatex(dx / 7)
+            self.translatey(-dy / 7)
+        else:
+            if abs(dy) > 2:
+                self.rotatex(np.arctan(dy)*1.3)
+            if abs(dx) > 2:
+                self.rotatey(np.arctan(dx)*1.3)
 
     def on_key_release(self, _symbol, _modifiers):
         pass
