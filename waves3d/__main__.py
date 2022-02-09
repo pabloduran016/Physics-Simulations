@@ -5,7 +5,7 @@ Written by Pablo Duran (https://github.com/pabloduran016)
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Type, Dict, Any
+from typing import List, Type, Dict, Any, Tuple
 
 from glumpy import app, gloo, gl, glm, key
 from numpy import pi

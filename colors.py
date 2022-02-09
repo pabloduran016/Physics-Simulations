@@ -3,6 +3,24 @@ from random import randint
 import numpy as np
 
 
+__all__ = [
+    'WHITE',
+    'BLACK',
+    'GREY',
+    'YELLOW',
+    'GREEN',
+    'RED',
+    'BLUE',
+    'CELESTE',
+    'PURPLE',
+    'PgColor',
+    'GLColor',
+    'random_color',
+    'cmap_color',
+    'gl_color',
+]
+
+
 WHITE = (255, 255, 255, 255)
 BLACK = (0, 0, 0, 255)
 GREY = (148, 148, 148, 255)
